@@ -1,46 +1,111 @@
-# SmartAlert #
+# GeoAlert: Real-Time Geological Hazard & Emergency Sensing System
 
-SmartAlert is an Android application, written in Java, designed to be helpful and provide alerts to dangerous situations, such as User Falling Down, Earthquakes and Fire Reports.
+**GeoAlert** is an Android emergency response and hazard detection platform designed to detect life-threatening geological and kinematic events in real time. It monitors ground motion, seismic vibrations, sudden falls, and debris burial using on-device physical sensors, immediately sounding audio alarms, dispatching emergency SMS alerts with GPS coordinates, and logging forensic telemetry.
 
-* # Fall Detection #
-In the main menu and when the device isn't charging, SmartAlert can detect possible falls by using data from the device's accelerometer. If it detects a fall then it gets in a
-confirmation mode and keeps reading the accelerometer's values for an extra half a minute. If it detects further normal movement then it cancels the alert, otherwise if it confirms
-a possible fall (for example if the devices stays still could indicate that user is unconcious) then it shows a warning message, rings an alarm (ringtone set by the user), plays TTS and
-gives him a reaction time (also set by the user). If he doesn't still abort the alarm, then an SMS message with a link to his location and event's timestamp will be sent to a
-recipient contact (already set by the user again). All kind of events are getting logged both in SQLite and Firebase.
+---
 
-* # Earthquake Detection #
-If the device is in the main menu and charging, then it constantly scans for possible earthquake vibrations using the device's accelerometer. If it detects an earthquake vibration,
-then it logs the event both in SQLite and Firebase and discretly informs the user. Everytime our device detects a possible earthquake vibration, then it looks 30 seconds earlier
-or 30 seconds after the detection for possible earthquakes recorded by other devices within a 500km radius of the user. If it does, then it rings an alarm (also sound set by the user),
-plays a TTS and informs the user. All events of course are logged both in SQLite and Firebase.
+## Key Capabilities
 
-* # Fire Report #
-If a user observes a fire then he can quickly report it by using the Fire Report function of this app. He can upload a picture of the fire that is imported either from the phone's
-Gallery or from a straight Camera snapshot. If done, then an SMS is sent (to a preset contact) and the event is logged both in SQLite and Firebase and the picture is also uploaded
-to the Firebase Storage.
+### 1. Seismic & Ground Vibration Monitoring
+- Continuously samples the 3-axis accelerometer at high frequency.
+- Computes total vector magnitude $|a| = \sqrt{a_x^2 + a_y^2 + a_z^2}$ and axis-wise peak accelerations.
+- Detects anomalous seismic vibrations exceeding calibrated thresholds.
+- Correlates multi-device event records within a geographic radius via cloud telemetry.
 
-* # View All Logs #
-The user can view any kind of events logged (fall detections, fire reports, earthquake detections) at any time by selecting the appropriate buttons from the main menu. All logs
-are available to see by their timestamp and after we tap on each timestamp we can see in depth details about each log.
+### 2. Fall & Impact Detection
+- Implements a two-phase state machine:
+  1. **Free Fall Phase**: detects weightlessness / free fall when vector magnitude drops below $5.0 \text{ m/s}^2$.
+  2. **Impact Phase**: validates sudden decelerative collision when vector magnitude spikes above $16.5 \text{ m/s}^2$ within a $1,200 \text{ ms}$ window.
+- Initiates an automated confirmation countdown timer with audible warning to prevent false positives before escalation.
 
-* # Languages #
-The whole app's UI (excluding only the TTS language version for compatibility purposes) is offered in 3 languages: English, Greek and Dutch. Dutch translation could be improved.
+### 3. Gravitational Tilt & Slope Displacement
+- Analyzes low-pass filtered gravity baseline vectors:
+  $$\theta = \arccos\left(\frac{\mathbf{a} \cdot \mathbf{g}_{\text{ref}}}{|\mathbf{a}| \cdot |\mathbf{g}_{\text{ref}}|}\right)$$
+- Detects angular ground subsidence and slope displacement exceeding safe operating boundaries.
 
-* # Settings #
-Many parts of the app are configurable such as: the alert ringtone sounds, the SMS alert recipients, the user's available response time in case of all and the app's language.
+### 4. Proximity & Debris Burial Detection
+- Monitors optical proximity sensors to detect debris burial, mudflow engulfment, or structural collapse entrapment.
 
-* # Quality Control #
-Most aspects of the app are materialized in a way that they offer good usability and reliability by implementing multiple checks in vital areas. For example, since the GPS location
-fix is very important in this app, we are using a broader strategy for acquiring a more reliable GPS fix by using both GPS and Network and in case both fail after a predetermined
-timeout, then seek of the device's last location.
+### 5. Multi-Channel Emergency Dispatch
+- **Automated SMS Dispatch**: sends immediate distress messages to designated emergency contacts containing live Google Maps location URLs (`https://maps.google.com/?q=lat,lng`) and timestamps.
+- **Siren & Text-to-Speech (TTS)**: plays audible siren alarms via Android `RingtoneManager` and speaks voice instructions via `TextToSpeech`.
+- **Dual Location Engine**: combines GPS and Cellular/Wi-Fi Network providers with automatic fallback to last known coordinates.
 
-* # To be done #
-- Various optimizations in the code and small reduction on the app's size.
+### 6. Dual-Tier Data Logging
+- **Local SQLite Storage**: logs every vibration, fall, and incident locally on-device for air-gapped operation.
+- **Cloud Synchronization**: synchronizes event records and incident photos with Firebase Realtime Database and Cloud Storage.
 
-- Better authentication system.
+---
 
-- Direct connection to the firebase also for the logs.
+## Architecture & Project Structure
 
-More details to follow.
+```
+GeoAlert/
+├── app/
+│   ├── src/main/
+│   │   ├── AndroidManifest.xml          # Permissions, activities, hardware features
+│   │   ├── java/org/geoalert/app/
+│   │   │   ├── GeoSensorEngine.java     # Multi-modal sensor monitoring engine
+│   │   │   ├── MainActivity.java        # Registration & authentication entry point
+│   │   │   ├── Menu.java                # Main dashboard & active monitoring loop
+│   │   │   ├── PossibleFall.java        # Fall confirmation state machine
+│   │   │   ├── FallDetected.java        # Escalation & emergency dispatch UI
+│   │   │   ├── EarthquakeRes.java       # Seismic event details & geographic map
+│   │   │   ├── EarthquakeList.java      # Historical seismic log viewer
+│   │   │   ├── FireReport.java          # Camera incident reporting with photo upload
+│   │   │   ├── SettingsMenu.java        # Threshold, language & contact configuration
+│   │   │   └── dbHelper.java            # Local SQLite schema & CRUD operations
+│   │   └── res/                         # UI layouts, colors, vector drawables
+│   ├── build.gradle                     # Android application dependencies & SDK config
+│   └── google-services.json             # Firebase configuration template
+├── build.gradle                         # Top-level Gradle build configuration
+└── settings.gradle                      # Project module definitions (rootProject: GeoAlert)
+```
 
+---
+
+## Hardware Permissions Required
+
+GeoAlert utilizes standard Android hardware sensors and telephony:
+- `android.permission.ACCESS_FINE_LOCATION` & `ACCESS_COARSE_LOCATION`: High-accuracy emergency dispatch coordinates.
+- `android.permission.SEND_SMS`: Emergency SMS alert transmission.
+- `android.permission.CAMERA` & `READ_EXTERNAL_STORAGE`: Photographic incident documentation.
+- `android.permission.INTERNET` & `ACCESS_NETWORK_STATE`: Telemetry sync and remote alert verification.
+- `android.permission.MODIFY_AUDIO_SETTINGS`: Emergency siren playback override.
+
+---
+
+## Getting Started
+
+### Prerequisites
+- Android Studio Hedgehog (2023.1.1) or newer
+- Android SDK Platform 29+ (Min SDK 23, Target SDK 29+)
+- Java Development Kit (JDK 8 or JDK 11)
+
+### Build Instructions
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/Hardik-droid/GeoAlert.git
+   cd GeoAlert
+   ```
+
+2. **Configure Firebase (Optional)**:
+   - To enable cloud sync, replace `app/google-services.json` with your Firebase project credentials.
+   - For standalone local operation, the app functions offline utilizing local SQLite storage.
+
+3. **Build via Gradle**:
+   ```bash
+   ./gradlew assembleDebug
+   ```
+
+4. **Install on physical test device**:
+   ```bash
+   adb install -r app/build/outputs/apk/debug/app-debug.apk
+   ```
+
+---
+
+## License & Attribution
+
+Based on initial prototypes by [GP2Engine](https://github.com/GP2Engine/SmartAlert) (Tasos Kollias). Rebranded, refactored, and modernized under **GeoAlert** for advanced geological hazard monitoring, gravitational tilt tracking, and automated emergency response.
